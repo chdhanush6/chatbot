@@ -1,0 +1,10 @@
+node_modules/
+uploads/*
+!uploads/.gitkeep
+.env
+.DS_Store
+Thumbs.db
+__pycache__/
+*.py[cod]
+*$py.class
+scratch/

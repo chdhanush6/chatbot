@@ -1,0 +1,466 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>DocuMind - Document AI Assistant</title>
+  <meta name="description" content="AI Assistant that answers questions strictly from your uploaded files (PDF, TXT, DOCX). Zero hallucination, 100% document-grounded.">
+  
+  <!-- Clean Modern Google Font: Inter -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  
+  <!-- Marked.js for fast, safe markdown parsing -->
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+  
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="app-container">
+    <!-- TOP NAVIGATION BAR -->
+    <header class="app-header">
+      <div class="header-brand">
+        <div class="brand-logo">
+          <svg class="gemini-sparkle" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+            <path d="M12 2L14.5 9.5L22 12L14.5 14.5L12 22L9.5 14.5L2 12L9.5 9.5L12 2Z" fill="url(#gemini-grad)"/>
+            <defs>
+              <linearGradient id="gemini-grad" x1="2" y1="2" x2="22" y2="22" gradientUnits="userSpaceOnUse">
+                <stop stop-color="#8B5CF6"/>
+                <stop offset="0.5" stop-color="#3B82F6"/>
+                <stop offset="1" stop-color="#06B6D4"/>
+              </linearGradient>
+            </defs>
+          </svg>
+        </div>
+        <div class="brand-info">
+          <h1 class="brand-title">DocuMind <span class="gradient-text">AI</span></h1>
+          <span class="brand-subtitle">Document-Grounded Assistant</span>
+        </div>
+      </div>
+
+      <div class="header-center">
+        <div class="grounding-badge" id="groundingBadge" title="Strict Mode: Responses are 100% derived from your uploaded document">
+          <span class="badge-dot"></span>
+          <svg class="badge-icon" viewBox="0 0 20 20" fill="currentColor">
+            <path fill-rule="evenodd" d="M10 1.944A11.954 11.954 0 012.166 5C2.056 5.649 2 6.319 2 7c0 5.225 3.34 9.67 8 11.317C14.66 16.67 18 12.225 18 7c0-.682-.057-1.35-.166-2.001A11.954 11.954 0 0110 1.944zM11 14a1 1 0 11-2 0 1 1 0 012 0zm0-7a1 1 0 10-2 0v3a1 1 0 102 0V7z" clip-rule="evenodd"/>
+          </svg>
+          <span class="badge-text">Strict Document Only</span>
+        </div>
+      </div>
+
+      <div class="header-actions">
+        <!-- API KEY BUTTON -->
+        <button id="apiKeyBtn" class="header-btn" title="Configure API Key">
+          <svg class="btn-icon" viewBox="0 0 20 20" fill="currentColor">
+            <path fill-rule="evenodd" d="M18 8a6 6 0 01-7.743 5.743L10 14l-1 1-1 1H6v2H2v-4l4.257-4.257A6 6 0 1118 8zm-6-4a1 1 0 100 2 2 2 0 012 2 1 1 0 102 0 4 4 0 00-4-4z" clip-rule="evenodd"/>
+          </svg>
+          <span class="btn-label">API Key</span>
+          <span id="apiKeyStatusDot" class="status-indicator"></span>
+        </button>
+
+        <!-- VIEW DOC BUTTON -->
+        <button id="viewDocBtn" class="header-btn" title="Inspect Document Content" style="display:none;">
+          <svg class="btn-icon" viewBox="0 0 20 20" fill="currentColor">
+            <path d="M10 12a2 2 0 100-4 2 2 0 000 4z" />
+            <path fill-rule="evenodd" d="M.458 10C1.732 5.943 5.522 3 10 3s8.268 2.943 9.542 7c-1.274 4.057-5.064 7-9.542 7S1.732 14.057.458 10zM14 10a4 4 0 11-8 0 4 4 0 018 0z" clip-rule="evenodd" />
+          </svg>
+          <span class="btn-label">Inspect</span>
+        </button>
+
+        <!-- NEW CHAT HEADER BUTTON -->
+        <button id="newChatHeaderBtn" class="header-btn" title="Start a fresh conversation">
+          <svg class="btn-icon" viewBox="0 0 20 20" fill="currentColor">
+            <path fill-rule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clip-rule="evenodd" />
+          </svg>
+          <span class="btn-label">New Chat</span>
+        </button>
+
+        <!-- CLEAR CHAT -->
+        <button id="clearChatBtn" class="header-btn btn-ghost" title="Clear Current Conversation">
+          <svg class="btn-icon" viewBox="0 0 20 20" fill="currentColor">
+            <path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clip-rule="evenodd" />
+          </svg>
+        </button>
+      </div>
+    </header>
+
+    <!-- MAIN BODY LAYOUT -->
+    <main class="app-main">
+      <!-- SIDEBAR -->
+      <aside class="app-sidebar" id="appSidebar">
+        <!-- NEW CHAT SIDEBAR BUTTON -->
+        <button id="newChatSidebarBtn" class="btn-new-chat" title="Start a fresh conversation">
+          <svg viewBox="0 0 20 20" fill="currentColor" width="16" height="16">
+            <path fill-rule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clip-rule="evenodd" />
+          </svg>
+          <span>New Chat</span>
+        </button>
+
+        <!-- CHAT HISTORY CARD -->
+        <section class="sidebar-card chat-history-card">
+          <div class="card-header">
+            <span class="section-title">Recent Chats</span>
+            <span class="history-count" id="historyCount">0</span>
+          </div>
+          <div id="chatHistoryList" class="chat-history-list">
+            <span class="empty-hint">No saved chats yet</span>
+          </div>
+        </section>
+
+        <!-- DOCUMENT STATUS CARD -->
+        <section class="sidebar-card doc-status-card" id="docStatusCard">
+          <div class="card-header">
+            <span class="section-title">Active Document</span>
+            <span id="docTypeBadge" class="doc-badge">None</span>
+          </div>
+
+          <div id="noDocState" class="empty-doc-state">
+            <svg class="empty-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 13h6m-3-3v6m5 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+            </svg>
+            <p>No document loaded yet</p>
+            <span class="empty-hint">Upload a PDF or select from below</span>
+          </div>
+
+          <div id="activeDocDetails" class="active-doc-info" style="display: none;">
+            <div class="doc-meta-header">
+              <div class="file-icon-wrapper" id="fileIconWrapper">
+                <svg viewBox="0 0 24 24" fill="currentColor">
+                  <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6zm4 18H6V4h7v5h5v11z"/>
+                </svg>
+              </div>
+              <div class="file-info-text">
+                <span class="doc-name" id="docName" title="Document Name">document.pdf</span>
+                <span class="doc-size" id="docSize">0 KB</span>
+              </div>
+            </div>
+
+            <!-- STATS GRID -->
+            <div class="stats-grid">
+              <div class="stat-item">
+                <span class="stat-value" id="docPages">0</span>
+                <span class="stat-label">Pages</span>
+              </div>
+              <div class="stat-item">
+                <span class="stat-value" id="docWords">0</span>
+                <span class="stat-label">Words</span>
+              </div>
+              <div class="stat-item">
+                <span class="stat-value" id="docChars">0</span>
+                <span class="stat-label">Chars</span>
+              </div>
+            </div>
+
+            <div class="doc-actions-row">
+              <button id="inspectDocBtn" class="btn-secondary btn-sm" title="Inspect Document Content">
+                <svg viewBox="0 0 20 20" fill="currentColor" width="14" height="14">
+                  <path d="M10 12a2 2 0 100-4 2 2 0 000 4z" />
+                  <path fill-rule="evenodd" d="M.458 10C1.732 5.943 5.522 3 10 3s8.268 2.943 9.542 7c-1.274 4.057-5.064 7-9.542 7S1.732 14.057.458 10zM14 10a4 4 0 11-8 0 4 4 0 018 0z" clip-rule="evenodd" />
+                </svg>
+                Preview Text
+              </button>
+              <button id="removeDocBtn" class="btn-danger btn-sm" title="Remove Document">
+                <svg viewBox="0 0 20 20" fill="currentColor" width="14" height="14">
+                  <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd" />
+                </svg>
+                Remove
+              </button>
+            </div>
+          </div>
+        </section>
+
+        <!-- COURSE SYLLABUS EXTRACTOR & DOWNLOADER CARD -->
+        <section class="sidebar-card course-extractor-card" id="courseExtractorCard">
+          <div class="card-header">
+            <span class="section-title">Course Syllabus PDF</span>
+            <span id="detectedCoursesBadge" class="doc-badge">0 Courses</span>
+          </div>
+
+          <div class="extractor-controls">
+            <div class="form-group" style="margin-bottom: 8px;">
+              <input 
+                type="text" 
+                id="courseSearchInput" 
+                class="form-input" 
+                placeholder="Course code (e.g. 24CS101) or title..." 
+                autocomplete="off"
+              />
+            </div>
+
+            <div class="form-group" style="margin-bottom: 8px;">
+              <select id="courseSelectDropdown" class="form-input form-select" title="Detected courses in syllabus">
+                <option value="">-- Or select detected course --</option>
+              </select>
+            </div>
+
+            <div id="courseInfoPill" class="course-info-pill" style="display: none;">
+              <span class="info-pill-icon">📄</span>
+              <span id="courseInfoText">Pages 45 - 46 (2 pages)</span>
+            </div>
+
+            <button type="button" id="downloadCoursePdfBtn" class="btn-primary btn-download" style="width: 100%; margin-top: 8px;">
+              <svg viewBox="0 0 20 20" fill="currentColor" width="16" height="16">
+                <path fill-rule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z" clip-rule="evenodd" />
+              </svg>
+              <span>Download Course PDF</span>
+            </button>
+
+            <div id="extractorStatusMsg" class="extractor-status-msg" style="display: none;"></div>
+          </div>
+        </section>
+
+        <!-- UPLOAD SECTION -->
+        <section class="sidebar-card upload-card">
+          <span class="section-title">Upload New File</span>
+          
+          <div class="dropzone" id="dropzone">
+            <input type="file" id="fileInput" accept=".pdf,.docx,.txt,.md,.csv,.json" class="file-input-hidden">
+            <div class="dropzone-content">
+              <div class="upload-icon-pulse">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/>
+                </svg>
+              </div>
+              <p class="dropzone-text"><strong>Click to browse</strong> or drag file here</p>
+              <span class="dropzone-hint">Supports PDF, DOCX, TXT, CSV, MD (up to 100MB)</span>
+            </div>
+          </div>
+
+          <div id="uploadProgress" class="upload-progress-container" style="display:none;">
+            <div class="progress-bar-wrapper">
+              <div class="progress-bar-fill" id="progressBarFill"></div>
+            </div>
+            <span class="progress-text" id="progressText">Parsing & indexing file...</span>
+          </div>
+        </section>
+
+        <!-- QUICK LOCAL FILES -->
+        <section class="sidebar-card local-files-card">
+          <div class="card-header">
+            <span class="section-title">Workspace Files</span>
+            <span class="hint-pill">1-Click</span>
+          </div>
+          <div id="localFilesList" class="local-files-list">
+            <!-- Dynamically populated -->
+            <div class="loading-spinner-sm"></div>
+          </div>
+        </section>
+
+        <!-- STRICT GROUNDING BADGE CARD -->
+        <div class="grounding-note">
+          <svg viewBox="0 0 20 20" fill="currentColor">
+            <path fill-rule="evenodd" d="M10 1.944A11.954 11.954 0 012.166 5C2.056 5.649 2 6.319 2 7c0 5.225 3.34 9.67 8 11.317C14.66 16.67 18 12.225 18 7c0-.682-.057-1.35-.166-2.001A11.954 11.954 0 0110 1.944zM11 14a1 1 0 11-2 0 1 1 0 012 0zm0-7a1 1 0 10-2 0v3a1 1 0 102 0V7z" clip-rule="evenodd"/>
+          </svg>
+          <span>Answers are <strong>grounded in your document</strong>. If an item is not found, related topics from the file will be suggested.</span>
+        </div>
+      </aside>
+
+      <!-- CHAT WORKSPACE -->
+      <section class="chat-workspace">
+        <!-- MESSAGES CONTAINER -->
+        <div class="messages-container" id="messagesContainer">
+          <!-- WELCOME STATE -->
+          <div class="welcome-container" id="welcomeContainer">
+            <div class="welcome-hero">
+              <div class="welcome-gemini-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                  <path d="M12 2L14.5 9.5L22 12L14.5 14.5L12 22L9.5 14.5L2 12L9.5 9.5L12 2Z" fill="url(#hero-gemini-grad)"/>
+                  <defs>
+                    <linearGradient id="hero-gemini-grad" x1="2" y1="2" x2="22" y2="22" gradientUnits="userSpaceOnUse">
+                      <stop stop-color="#A78BFA"/>
+                      <stop offset="0.5" stop-color="#60A5FA"/>
+                      <stop offset="1" stop-color="#2DD4BF"/>
+                    </linearGradient>
+                  </defs>
+                </svg>
+              </div>
+              <h2 class="welcome-heading">DocuMind <span class="gradient-text">AI Assistant</span></h2>
+              <p class="welcome-desc">
+                Ask any question about your uploaded document and get precise, factual answers with source citations.
+              </p>
+              <div class="welcome-features">
+                <div class="feature-tag">
+                  <span class="check-icon">✓</span> 100% Strict Document Grounding
+                </div>
+                <div class="feature-tag">
+                  <span class="check-icon">✓</span> Zero Outside Hallucination
+                </div>
+                <div class="feature-tag">
+                  <span class="check-icon">✓</span> Page & Section Source Citations
+                </div>
+              </div>
+            </div>
+
+            <!-- PROMPT SUGGESTIONS (Populated dynamically based on document) -->
+            <div class="suggestions-wrapper" id="suggestionsWrapper">
+              <span class="suggestions-title">Suggested questions from this document:</span>
+              <div class="prompt-chips" id="promptChips">
+                <button class="prompt-chip" data-query="Summarize this entire document in 5 key bullet points.">
+                  📄 Summarize this document
+                </button>
+                <button class="prompt-chip" data-query="What are the main topics or subjects covered in this document?">
+                  📚 What subjects are covered?
+                </button>
+                <button class="prompt-chip" data-query="List the course structure and credits for 1st Year (Semester 1 & 2).">
+                  🎓 1st Year Course Structure & Credits
+                </button>
+                <button class="prompt-chip" data-query="What are the laboratory or practical courses mentioned in this syllabus?">
+                  🔬 Laboratory courses list
+                </button>
+              </div>
+            </div>
+          </div>
+          <!-- CHAT MESSAGES INJECTED HERE -->
+        </div>
+
+        <!-- TYPING INDICATOR -->
+        <div class="typing-indicator-row" id="typingIndicator" style="display: none;">
+          <div class="bot-avatar-sm">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+              <path d="M12 2L14.5 9.5L22 12L14.5 14.5L12 22L9.5 14.5L2 12L9.5 9.5L12 2Z" fill="currentColor"/>
+            </svg>
+          </div>
+          <div class="typing-bubble">
+            <span class="typing-dot"></span>
+            <span class="typing-dot"></span>
+            <span class="typing-dot"></span>
+            <span class="typing-status-text">Searching document & formulating answer...</span>
+          </div>
+        </div>
+
+        <!-- CHAT INPUT FOOTER -->
+        <footer class="chat-footer">
+          <form id="chatForm" class="chat-form">
+            <!-- QUICK ATTACH BUTTON -->
+            <button type="button" id="attachBtn" class="input-action-btn" title="Upload new document">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13"/>
+              </svg>
+            </button>
+
+            <!-- TEXTAREA -->
+            <textarea 
+              id="messageInput" 
+              class="message-textarea" 
+              placeholder="Ask anything about the document... (e.g. 'What is the syllabus for 2nd semester?')" 
+              rows="1"
+              required></textarea>
+
+            <!-- SEND BUTTON -->
+            <button type="submit" id="sendBtn" class="send-btn" title="Send Question (Enter)">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.2" d="M5 12h14M12 5l7 7-7 7"/>
+              </svg>
+            </button>
+
+            <!-- STOP GENERATING BUTTON -->
+            <button type="button" id="stopBtn" class="stop-btn" title="Stop Generating" style="display: none;">
+              <svg viewBox="0 0 24 24" fill="currentColor">
+                <rect x="6" y="6" width="12" height="12" rx="2"/>
+              </svg>
+            </button>
+          </form>
+
+          <div class="footer-note">
+            <span class="shortcut-hint">Press <strong>Enter</strong> to send &bull; <strong>Shift + Enter</strong> for new line</span>
+            <span class="document-indicator" id="footerDocIndicator">No file loaded</span>
+          </div>
+        </footer>
+      </section>
+    </main>
+  </div>
+
+  <!-- API KEY MODAL -->
+  <div class="modal-backdrop" id="apiKeyModal" style="display: none;">
+    <div class="modal-card">
+      <div class="modal-header">
+        <div class="modal-title-row">
+          <div class="modal-icon key-icon-bg">
+            <svg viewBox="0 0 20 20" fill="currentColor">
+              <path fill-rule="evenodd" d="M18 8a6 6 0 01-7.743 5.743L10 14l-1 1-1 1H6v2H2v-4l4.257-4.257A6 6 0 1118 8zm-6-4a1 1 0 100 2 2 2 0 012 2 1 1 0 102 0 4 4 0 00-4-4z" clip-rule="evenodd"/>
+            </svg>
+          </div>
+          <div>
+            <h3 class="modal-heading">Configure API Key</h3>
+            <p class="modal-subtitle">Enter your API key to activate the assistant.</p>
+          </div>
+        </div>
+        <button type="button" class="modal-close" id="closeApiKeyModal">&times;</button>
+      </div>
+
+      <div class="modal-body">
+        <div class="form-group">
+          <label for="apiKeyInput" class="form-label">API Key</label>
+          <div class="input-with-action">
+            <input 
+              type="password" 
+              id="apiKeyInput" 
+              class="form-input" 
+              placeholder="Enter your API key..." 
+              autocomplete="off"
+            >
+            <button type="button" id="toggleKeyVisibility" class="btn-input-eye" title="Toggle Visibility">
+              👁️
+            </button>
+          </div>
+          <span class="input-help">
+            Don't have a key? 
+            <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener noreferrer">Get a free API key &rarr;</a>
+          </span>
+        </div>
+
+        <div id="keyValidationResult" class="validation-message" style="display:none;"></div>
+
+        <div class="key-security-note">
+          <svg viewBox="0 0 20 20" fill="currentColor" width="16" height="16">
+            <path fill-rule="evenodd" d="M2.166 4.999A11.954 11.954 0 0010 1.944 11.954 11.954 0 0017.834 5c.11.65.166 1.32.166 2.001 0 5.225-3.34 9.67-8 11.317C5.34 16.67 2 12.225 2 7c0-.682.057-1.35.166-2.001zm11.541 3.708a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/>
+          </svg>
+          <span>Your key is stored securely in your browser's local storage and used directly for your requests.</span>
+        </div>
+      </div>
+
+      <div class="modal-footer">
+        <button type="button" id="testKeyBtn" class="btn-secondary">Test Connection</button>
+        <button type="button" id="saveKeyBtn" class="btn-primary">Save Key</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- DOCUMENT TEXT INSPECT MODAL -->
+  <div class="modal-backdrop" id="inspectDocModal" style="display: none;">
+    <div class="modal-card modal-lg">
+      <div class="modal-header">
+        <div class="modal-title-row">
+          <div class="modal-icon doc-icon-bg">
+            <svg viewBox="0 0 24 24" fill="currentColor">
+              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6zm4 18H6V4h7v5h5v11z"/>
+            </svg>
+          </div>
+          <div>
+            <h3 class="modal-heading" id="inspectModalTitle">Document Preview</h3>
+            <p class="modal-subtitle" id="inspectModalStats">Indexed text available to the assistant</p>
+          </div>
+        </div>
+        <button type="button" class="modal-close" id="closeInspectModal">&times;</button>
+      </div>
+
+      <div class="modal-body">
+        <div class="inspect-search-bar">
+          <input type="text" id="inspectSearchInput" class="form-input" placeholder="Search extracted text...">
+        </div>
+        <pre class="document-text-viewer" id="docTextPreview">Loading document text...</pre>
+      </div>
+
+      <div class="modal-footer">
+        <button type="button" id="closeInspectBtn" class="btn-secondary">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- TOAST NOTIFICATION CONTAINER -->
+  <div id="toastContainer" class="toast-container"></div>
+
+  <script src="app.js"></script>
+</body>
+</html>
