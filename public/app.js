@@ -960,7 +960,7 @@ document.addEventListener('DOMContentLoaded', () => {
         body: JSON.stringify({
           prompt: query,
           apiKey: apiKey || '',
-          model: 'gemini-3.8-flash',
+          model: 'gemini-3.5-flash-lite',
           language: 'en',
           chatHistory: chatHistoryPayload
         }),

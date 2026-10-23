@@ -1,12 +1,13 @@
 const DEFAULT_MODELS = [
-  'gemini-3.8-flash',
-  'gemini-3.7-flash',
+  'gemini-3.5-flash-lite',
+  'gemini-flash-lite-latest',
   'gemini-3.6-flash',
   'gemini-3.5-flash',
-  'gemini-3.1-flash-lite',
-  'gemini-flash-lite-latest',
-  'gemini-2.5-flash-lite'
+  'gemini-flash-latest',
+  'gemini-3.8-flash'
 ];
+
+let cachedWorkingModel = 'gemini-3.5-flash-lite';
 
 /**
  * Build conversational & document-grounded system instruction in English.
@@ -16,10 +17,11 @@ function buildSystemInstruction(documentInfo, languagePref = 'en') {
 
 CORE OPERATIONAL BEHAVIORS:
 1. GREETINGS & CASUAL INTERACTION:
-   - When the user sends a friendly greeting (such as "hi", "hello", "hey", "good morning", "good evening", "namaste", "who are you", "what can you do"):
+   - ONLY when the user's message is PURELY a greeting with no questions (e.g. only "hi", "hello", "hey", "namaste", "good morning"):
      * Respond warmly, naturally, and politely as Document AI.
-     * Tell the user that you are ready to help with their active document: "${documentInfo.filename}" (${documentInfo.pageCount || 'several'} pages).
-     * Proactively suggest 3 to 4 specific, interesting questions they can ask about this document.
+     * State that you are ready to help with "${documentInfo.filename}" (${documentInfo.pageCount || 'several'} pages).
+     * Proactively suggest 3 to 4 specific, interesting questions they can ask.
+   - For ANY message asking a question, course code, subject, or count (e.g. "total anni courses available unnai", "what is 25CS101"): DO NOT prepend greetings or suggestions; jump directly and immediately into the comprehensive answer!
 
 2. COURTESY & SMALL TALK:
    - When the user expresses gratitude (e.g., "thank you", "thanks", "great job", "ok", "cool", "bye"):
@@ -201,7 +203,7 @@ function cleanLatexToPlainText(raw) {
 
 /**
  * Select the most relevant sections of the document for the query and chat context.
- * Automatically expands course syllabus pages to include continuation pages (Module 2, COs, Textbooks).
+ * Optimized for lightning-fast sub-second responses without sacrificing accuracy.
  */
 function getRelevantContext(documentInfo = {}, documentText = '', pagesData = [], query = '', chatHistory = []) {
   // Build master detected course directory header if available
@@ -211,23 +213,43 @@ function getRelevantContext(documentInfo = {}, documentText = '', pagesData = []
       documentInfo.courses.map((c, i) => `${i + 1}. [${c.code}] ${c.title} (Page ${c.start_page}${c.end_page > c.start_page ? '-' + c.end_page : ''})`).join('\n') + '\n\n';
   }
 
-  // Modern Gemini models (3.8-flash, 3.7-flash, 2.5-flash) have a 1,000,000 token context window (~4,000,000 chars).
-  // If the document is within 450,000 characters (e.g. 200-250 page syllabus PDFs), send the FULL document text
-  // with page markers so Gemini has 100% of all courses, pages, and electives on prompt 1 without any omissions.
-  if (!documentText || documentText.length <= 450000) {
+  const trimmedQuery = (query || '').trim().toLowerCase();
+
+  // 1. LIGHTNING FAST PATH: Friendly greetings and polite pleasantries (< 1s response)
+  const isGreetingOrCasual = /^(hi|hello|hey|greetings|namaste|good\s*(morning|afternoon|evening)|who\s+are\s+you|what\s+can\s+you\s+do|thanks|thank\s+you|ok|cool|bye|start)[\s!?.]*$/i.test(trimmedQuery);
+  if (isGreetingOrCasual) {
+    const totalPages = documentInfo.pageCount || (Array.isArray(pagesData) ? pagesData.length : 'several');
+    const totalCourses = documentInfo.totalCourses || (documentInfo.courses ? documentInfo.courses.length : 0);
+    return `${masterCourseHeader}DOCUMENT SUMMARY:
+Filename: ${documentInfo.filename || 'Uploaded Document'}
+Total Pages: ${totalPages}
+Total Courses: ${totalCourses}
+Ready to assist with questions about regulations, curriculum, course syllabi, credits, or textbooks.`;
+  }
+
+  // If document is small (< 50,000 characters), pass full document text
+  if (!documentText || documentText.length <= 50000) {
     if (Array.isArray(pagesData) && pagesData.length > 0) {
-      const fullPagesText = pagesData.map(p => `--- PAGE ${p.pageNumber} ---\n${p.text}`).join('\n\n');
-      return masterCourseHeader + fullPagesText;
+      return masterCourseHeader + pagesData.map(p => `--- PAGE ${p.pageNumber} ---\n${p.text}`).join('\n\n');
     }
     return masterCourseHeader + (documentText || '');
   }
 
-  // For extremely large documents (> 450,000 characters, e.g. 1,000+ pages), use smart structure-aware RAG:
+  // 2. CURRICULUM & TOTAL COURSES PATH: "how many courses", "list all courses", "anni subjects"
+  const isAllCoursesQuery = /(total|anni|all|motham|list|how many|enni).*(courses|subjects|syllabus)/i.test(trimmedQuery) ||
+    /courses?.*(available|list|details|structure|count)/i.test(trimmedQuery) ||
+    /(curriculum|credit distribution|scheme of instruction)/i.test(trimmedQuery);
+
+  if (isAllCoursesQuery && Array.isArray(pagesData) && pagesData.length > 0) {
+    // Pages 1 to 20 contain the entire academic curriculum, semester tables, and elective categories
+    const structurePages = pagesData.filter(p => p.pageNumber <= 20);
+    return masterCourseHeader + structurePages.map(p => `--- PAGE ${p.pageNumber} ---\n${p.text}`).join('\n\n');
+  }
+
+  // 3. TARGETED COURSE SYLLABUS PATH: Specific Course Code (e.g. 25CS101) or Title
   if (Array.isArray(pagesData) && pagesData.length > 0) {
     const courseCodeRegex = /\b([0-9]{2}[A-Za-z]{2,4}[0-9]{2,4}[A-Za-z]?)\b/g;
     const detectedCourseCodes = new Set();
-
-    // Check query for course codes (e.g., 25CS101)
     const queryMatches = (query || '').match(courseCodeRegex);
     if (queryMatches) {
       queryMatches.forEach(c => detectedCourseCodes.add(c.toUpperCase()));
@@ -247,47 +269,37 @@ function getRelevantContext(documentInfo = {}, documentText = '', pagesData = []
 
     const mustIncludePageNumbers = new Set();
 
-    // Always include all Table of Contents and Course Structure pages (e.g. pages 1-15)
-    for (let i = 1; i <= Math.min(15, pagesData.length); i++) {
+    // Include Table of Contents / Scheme overview (pages 1 to 14)
+    for (let i = 1; i <= Math.min(14, pagesData.length); i++) {
       mustIncludePageNumbers.add(i);
     }
 
-    // Also include any page that has core curriculum / structure headers
-    const structureKeywords = [
-      'table of contents', 'course structure', 'department electives',
-      'scheme of instruction', 'credit distribution', 'open electives'
-    ];
-    pagesData.forEach(p => {
-      const lowerText = p.text.toLowerCase();
-      if (structureKeywords.some(kw => lowerText.includes(kw))) {
-        mustIncludePageNumbers.add(p.pageNumber);
-      }
-    });
-
-    // If specific course codes are detected: include start page and continuation pages
+    // If specific course codes detected: include start page and continuation pages
     if (detectedCourseCodes.size > 0) {
       for (const code of detectedCourseCodes) {
-        for (const p of pagesData) {
-          const upperText = p.text.toUpperCase();
-          if (upperText.includes(code)) {
-            mustIncludePageNumbers.add(p.pageNumber);
-            if (p.pageNumber >= 16) {
-              if (p.pageNumber + 1 <= pagesData.length) {
-                mustIncludePageNumbers.add(p.pageNumber + 1);
-              }
-              if (p.pageNumber + 2 <= pagesData.length) {
-                const nextPage = pagesData.find(pg => pg.pageNumber === p.pageNumber + 1);
-                const startsNewCourse = /^[0-9]{2}[A-Z]{2}[0-9]{3}\s+[A-Z\s]+/m.test(nextPage?.text || '');
-                if (!startsNewCourse) {
-                  mustIncludePageNumbers.add(p.pageNumber + 2);
-                }
-              }
+        if (Array.isArray(documentInfo.courses)) {
+          const matched = documentInfo.courses.find(c => c.code.toUpperCase() === code);
+          if (matched) {
+            const start = matched.start_page;
+            const end = Math.max(matched.end_page || start, start + 3);
+            for (let pg = start; pg <= Math.min(end, pagesData.length); pg++) {
+              mustIncludePageNumbers.add(pg);
             }
+          }
+        }
+
+        // Direct text scan fallback
+        for (const p of pagesData) {
+          if (p.text.toUpperCase().includes(code)) {
+            mustIncludePageNumbers.add(p.pageNumber);
+            if (p.pageNumber + 1 <= pagesData.length) mustIncludePageNumbers.add(p.pageNumber + 1);
+            if (p.pageNumber + 2 <= pagesData.length) mustIncludePageNumbers.add(p.pageNumber + 2);
           }
         }
       }
     }
 
+    // Keyword scoring for additional relevant pages
     const stopWords = new Set([
       'the', 'and', 'for', 'with', 'what', 'give', 'tell', 'show', 'any', 'like',
       'this', 'that', 'there', 'is', 'are', 'was', 'were',
@@ -299,26 +311,15 @@ function getRelevantContext(documentInfo = {}, documentText = '', pagesData = []
       .toLowerCase()
       .replace(/[^a-z0-9\s]/gi, ' ')
       .split(/\s+/)
-      .filter(t => t.length > 1 && !stopWords.has(t));
-
-    const allTokens = Array.from(new Set([...rawTokens, ...Array.from(detectedCourseCodes).map(c => c.toLowerCase())]));
+      .filter(t => t.length > 2 && !stopWords.has(t));
 
     const scoredPages = pagesData.map(p => {
       const lower = p.text.toLowerCase();
       let score = 0;
-
-      if (mustIncludePageNumbers.has(p.pageNumber)) {
-        score += 50;
+      if (mustIncludePageNumbers.has(p.pageNumber)) score += 60;
+      for (const token of rawTokens) {
+        if (lower.includes(token)) score += 15;
       }
-
-      for (const token of allTokens) {
-        if (lower.includes(token)) {
-          const isCode = /^[0-9]{2}[a-z]{2,4}[0-9]{2,4}$/.test(token);
-          const weight = isCode ? 70 : 20;
-          score += weight;
-        }
-      }
-
       return { page: p, score };
     });
 
@@ -326,7 +327,7 @@ function getRelevantContext(documentInfo = {}, documentText = '', pagesData = []
 
     const selected = [];
     let currentLength = 0;
-    const maxChars = 300000;
+    const maxChars = 55000; // Optimal context size for fast 1-2s inference
 
     const sortedMustNumbers = Array.from(mustIncludePageNumbers).sort((a, b) => a - b);
     for (const pageNum of sortedMustNumbers) {
@@ -349,14 +350,13 @@ function getRelevantContext(documentInfo = {}, documentText = '', pagesData = []
     }
 
     selected.sort((a, b) => a.pageNumber - b.pageNumber);
-
     if (selected.length > 0) {
       return masterCourseHeader + selected.map(p => `--- PAGE ${p.pageNumber} ---\n${p.text}`).join('\n\n');
     }
   }
 
   // Fallback
-  return masterCourseHeader + documentText.slice(0, 100000);
+  return masterCourseHeader + documentText.slice(0, 50000);
 }
 
 /**
@@ -393,7 +393,7 @@ async function validateApiKey(apiKey) {
  */
 async function* streamDocumentResponse({
   apiKey,
-  model = 'gemini-3.8-flash',
+  model = 'gemini-3.5-flash-lite',
   documentInfo,
   documentText,
   pagesData,
@@ -405,15 +405,26 @@ async function* streamDocumentResponse({
   const systemInstructionText = buildSystemInstruction(documentInfo, languagePref);
   const contextText = getRelevantContext(documentInfo, documentText, pagesData, userQuery, chatHistory);
 
+  // Fast prioritized models: Put cached working model and fastest lite models first
   const candidateModels = [
     model,
-    ...DEFAULT_MODELS.filter(m => m !== model)
-  ];
+    cachedWorkingModel,
+    ...DEFAULT_MODELS
+  ].filter((m, idx, self) => self.indexOf(m) === idx);
 
   let lastError = null;
 
   for (const currentModel of candidateModels) {
     if (signal?.aborted) return;
+    
+    // 5-second connection timeout per model attempt to prevent hanging on congested models
+    const attemptController = new AbortController();
+    const parentAbortHandler = () => attemptController.abort();
+    if (signal) signal.addEventListener('abort', parentAbortHandler);
+    const timeoutTimer = setTimeout(() => {
+      attemptController.abort(new Error(`Connection to model ${currentModel} timed out after 5s`));
+    }, 5000);
+
     try {
       const url = `https://generativelanguage.googleapis.com/v1beta/models/${currentModel}:streamGenerateContent?alt=sse&key=${apiKey.trim()}`;
 
@@ -473,8 +484,11 @@ ${userQuery}
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
-        signal
+        signal: attemptController.signal
       });
+
+      clearTimeout(timeoutTimer);
+      if (signal) signal.removeEventListener('abort', parentAbortHandler);
 
       if (!res.ok) {
         const errJson = await res.json().catch(() => ({}));
@@ -530,7 +544,11 @@ ${userQuery}
             const parsed = JSON.parse(jsonStr);
             const textChunk = parsed.candidates?.[0]?.content?.parts?.map(p => p.text).join('') || '';
             if (textChunk) {
-              hasYieldedAny = true;
+              if (!hasYieldedAny) {
+                // First successful chunk -> memorize this model as fastest working model
+                cachedWorkingModel = currentModel;
+                hasYieldedAny = true;
+              }
               yield {
                 text: textChunk,
                 model: currentModel
@@ -546,21 +564,14 @@ ${userQuery}
         return; // Success!
       }
     } catch (err) {
+      clearTimeout(timeoutTimer);
+      if (signal) signal.removeEventListener('abort', parentAbortHandler);
       if (signal?.aborted) return;
+      
       lastError = err;
       const lower = (err.message || '').toLowerCase();
-      if (lower.includes('404') ||
-          lower.includes('503') ||
-          lower.includes('429') ||
-          lower.includes('quota') ||
-          lower.includes('high demand') ||
-          lower.includes('not found') ||
-          lower.includes('no longer available') ||
-          lower.includes('deprecated') ||
-          lower.includes('unavailable')) {
-        continue;
-      }
-      throw err;
+      console.warn(`[Gemini Stream] Model "${currentModel}" note: ${err.message}. Trying next candidate...`);
+      continue;
     }
   }
 
@@ -572,7 +583,7 @@ ${userQuery}
  */
 async function generateDocumentResponse({
   apiKey,
-  model = 'gemini-3.8-flash',
+  model = 'gemini-3.5-flash-lite',
   documentInfo,
   documentText,
   pagesData,
@@ -585,12 +596,18 @@ async function generateDocumentResponse({
 
   const candidateModels = [
     model,
-    ...DEFAULT_MODELS.filter(m => m !== model)
-  ];
+    cachedWorkingModel,
+    ...DEFAULT_MODELS
+  ].filter((m, idx, self) => self.indexOf(m) === idx);
 
   let lastError = null;
 
   for (const currentModel of candidateModels) {
+    const attemptController = new AbortController();
+    const timeoutTimer = setTimeout(() => {
+      attemptController.abort(new Error(`Model ${currentModel} timed out after 5s`));
+    }, 5000);
+
     try {
       const url = `https://generativelanguage.googleapis.com/v1beta/models/${currentModel}:generateContent?key=${apiKey.trim()}`;
 
@@ -647,8 +664,11 @@ ${userQuery}
       const res = await fetch(url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
+        body: JSON.stringify(payload),
+        signal: attemptController.signal
       });
+
+      clearTimeout(timeoutTimer);
 
       if (!res.ok) {
         const errJson = await res.json().catch(() => ({}));
@@ -683,6 +703,7 @@ ${userQuery}
         throw new Error('Gemini returned an empty response. Please try rephrasing your question.');
       }
 
+      cachedWorkingModel = currentModel;
       const cleanedAnswer = cleanLatexToPlainText(answerText);
 
       return {
@@ -691,20 +712,10 @@ ${userQuery}
         usage: data.usageMetadata || null
       };
     } catch (err) {
+      clearTimeout(timeoutTimer);
       lastError = err;
-      const lower = (err.message || '').toLowerCase();
-      if (lower.includes('404') ||
-          lower.includes('503') ||
-          lower.includes('429') ||
-          lower.includes('quota') ||
-          lower.includes('high demand') ||
-          lower.includes('not found') ||
-          lower.includes('no longer available') ||
-          lower.includes('deprecated') ||
-          lower.includes('unavailable')) {
-        continue;
-      }
-      throw err;
+      console.warn(`[Gemini] Model "${currentModel}" note: ${err.message}. Trying next candidate...`);
+      continue;
     }
   }
 

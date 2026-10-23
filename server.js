@@ -352,7 +352,7 @@ app.post('/api/chat/stream', async (req, res) => {
   try {
     const stream = streamDocumentResponse({
       apiKey: effectiveApiKey,
-      model: model || 'gemini-3.8-flash',
+      model: model || 'gemini-3.5-flash-lite',
       documentInfo: {
         filename: currentDocument.filename,
         pageCount: currentDocument.pageCount,
@@ -413,7 +413,7 @@ app.post('/api/chat', async (req, res) => {
 
     const response = await generateDocumentResponse({
       apiKey: effectiveApiKey,
-      model: model || 'gemini-3.8-flash',
+      model: model || 'gemini-3.5-flash-lite',
       documentInfo: {
         filename: currentDocument.filename,
         pageCount: currentDocument.pageCount,
