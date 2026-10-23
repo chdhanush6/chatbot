@@ -63,6 +63,19 @@ function getLocalDocuments() {
   }
 }
 
+// Helper to enrich document with course index if PDF
+async function enrichDocumentCourses(doc) {
+  if (doc && doc.extension === '.pdf' && doc.filePath) {
+    try {
+      const indexData = await indexDocument(doc.filePath);
+      doc.courses = indexData.courses || [];
+      doc.totalCourses = indexData.courses_count || doc.courses.length;
+    } catch (e) {
+      console.warn('Course indexing note:', e.message);
+    }
+  }
+}
+
 // Auto-load default PDF if available in workspace and none loaded yet
 (async function initDefaultDoc() {
   const defaultPdfName = 'R25 C25 CSE Course Structure & Syllabus.pdf';
@@ -71,8 +84,9 @@ function getLocalDocuments() {
     try {
       console.log(`Auto-indexing workspace document: ${defaultPdfName}...`);
       const parsed = await parseFile(defaultPdfPath, defaultPdfName);
+      await enrichDocumentCourses(parsed);
       currentDocument = parsed;
-      console.log(`Indexed successfully: ${parsed.pageCount} pages, ${parsed.wordCount} words.`);
+      console.log(`Indexed successfully: ${parsed.pageCount} pages, ${parsed.wordCount} words, ${parsed.totalCourses || 0} courses detected.`);
     } catch (err) {
       console.warn(`Could not auto-index default file:`, err.message);
     }
@@ -127,6 +141,7 @@ app.post('/api/load-local', async (req, res) => {
     }
 
     const parsed = await parseFile(filePath, safeFilename);
+    await enrichDocumentCourses(parsed);
     currentDocument = parsed;
 
     res.json({
@@ -160,6 +175,7 @@ app.post('/api/upload', upload.single('file'), async (req, res) => {
     const tempPath = req.file.path;
 
     const parsed = await parseFile(tempPath, originalName, req.file.mimetype);
+    await enrichDocumentCourses(parsed);
     currentDocument = parsed;
 
     res.json({
@@ -336,11 +352,13 @@ app.post('/api/chat/stream', async (req, res) => {
   try {
     const stream = streamDocumentResponse({
       apiKey: effectiveApiKey,
-      model: model || 'gemini-3.1-flash-lite',
+      model: model || 'gemini-3.8-flash',
       documentInfo: {
         filename: currentDocument.filename,
         pageCount: currentDocument.pageCount,
-        wordCount: currentDocument.wordCount
+        wordCount: currentDocument.wordCount,
+        courses: currentDocument.courses || [],
+        totalCourses: currentDocument.totalCourses || (currentDocument.courses ? currentDocument.courses.length : 0)
       },
       documentText: currentDocument.text,
       pagesData: currentDocument.pagesData,
@@ -395,11 +413,13 @@ app.post('/api/chat', async (req, res) => {
 
     const response = await generateDocumentResponse({
       apiKey: effectiveApiKey,
-      model: model || 'gemini-3.1-flash-lite',
+      model: model || 'gemini-3.8-flash',
       documentInfo: {
         filename: currentDocument.filename,
         pageCount: currentDocument.pageCount,
-        wordCount: currentDocument.wordCount
+        wordCount: currentDocument.wordCount,
+        courses: currentDocument.courses || [],
+        totalCourses: currentDocument.totalCourses || (currentDocument.courses ? currentDocument.courses.length : 0)
       },
       documentText: currentDocument.text,
       pagesData: currentDocument.pagesData,
@@ -424,7 +444,7 @@ app.post('/api/chat', async (req, res) => {
 // Start Server
 app.listen(PORT, () => {
   console.log(`===============================================`);
-  console.log(`🚀 DocuMind Document AI Chatbot is running!`);
+  console.log(`🚀 Document AI Chatbot is running!`);
   console.log(`🌐 Local URL: http://localhost:${PORT}`);
   console.log(`===============================================`);
 });

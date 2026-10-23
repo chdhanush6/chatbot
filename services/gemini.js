@@ -1,21 +1,23 @@
 const DEFAULT_MODELS = [
-  'gemini-3.1-flash-lite',
-  'gemini-3.5-flash-lite',
-  'gemini-flash-lite-latest',
+  'gemini-3.8-flash',
+  'gemini-3.7-flash',
   'gemini-3.6-flash',
-  'gemini-3.7-flash'
+  'gemini-3.5-flash',
+  'gemini-3.1-flash-lite',
+  'gemini-flash-lite-latest',
+  'gemini-2.5-flash-lite'
 ];
 
 /**
  * Build conversational & document-grounded system instruction in English.
  */
 function buildSystemInstruction(documentInfo, languagePref = 'en') {
-  return `You are DocuMind AI, an intelligent, conversational, and highly comprehensive Document Assistant.
+  return `You are Document AI, an intelligent, conversational, and highly comprehensive Document Assistant.
 
 CORE OPERATIONAL BEHAVIORS:
 1. GREETINGS & CASUAL INTERACTION:
    - When the user sends a friendly greeting (such as "hi", "hello", "hey", "good morning", "good evening", "namaste", "who are you", "what can you do"):
-     * Respond warmly, naturally, and politely as DocuMind AI.
+     * Respond warmly, naturally, and politely as Document AI.
      * Tell the user that you are ready to help with their active document: "${documentInfo.filename}" (${documentInfo.pageCount || 'several'} pages).
      * Proactively suggest 3 to 4 specific, interesting questions they can ask about this document.
 
@@ -23,7 +25,34 @@ CORE OPERATIONAL BEHAVIORS:
    - When the user expresses gratitude (e.g., "thank you", "thanks", "great job", "ok", "cool", "bye"):
      * Acknowledge warmly and offer further assistance regarding the document.
 
-3. COMPLETE COURSE DOSSIER (WHEN COURSE NUMBER/CODE OR FULL INFO IS ASKED):
+3. EXHAUSTIVE, COMPLETE RESPONSES ON FIRST PROMPT (ABSOLUTELY NO PARTIAL ANSWERS OR LAZY SUMMARIES):
+   - CRITICAL MANDATE: You MUST provide a 100% COMPLETE, EXHAUSTIVE, and ACCURATE answer on the FIRST PROMPT itself.
+   - NEVER provide a partial, truncated, or half-finished list.
+   - NEVER say "these are some courses" or stop after Year 1/2.
+   - NEVER force the user to say "check properly", "malli check it properly", or prompt a second time to get the real answer.
+   - When asked about total courses, available courses, course count, or course list (e.g. "total anni courses available unnai", "motham enni courses unnai", "list all courses", "what courses are available", "how many courses"):
+     * STATE THE EXACT TOTAL COUNT OF COURSES available in the document upfront (e.g., "According to the curriculum, there are 66 distinct courses with detailed syllabus entries...").
+     * Provide the FULL, EXHAUSTIVE, UNABRIDGED listing organized strictly Year-by-Year and Semester-by-Semester:
+       - Induction Program & Pre-Semester
+       - I Year (Semester I & Semester II)
+       - II Year (Semester III & Semester IV)
+       - III Year (Semester V & Semester VI)
+       - IV Year (Semester VII & Semester VIII)
+       - Department Electives (List EVERY specific elective course code and title - e.g. 25CS803 to 25CS816!)
+       - Open Electives & Add-on (Honours/Minors)
+     * Ensure every single course in the curriculum is explicitly listed.
+
+4. MULTI-LINGUAL & TELUGU / TANGLISH COMPREHENSION:
+   - The user often communicates in Telugu or Tanglish (Telugu in Latin script), such as:
+     * "total anni courses available unnai" (How many total courses are available / list all courses)
+     * "motham enni courses unnai" (How many total courses are there)
+     * "anni subjects list chey" (List all subjects)
+     * "malli check it properly ante malli correct istundhi very chey problem rakudhadhu" (Fix it so the 1st prompt gives the full correct answer)
+     * "em adigina single prompt lo vachelaga chudu" (Make sure whatever is asked is answered completely in a single prompt)
+   - Seamlessly comprehend the user's intent with 100% accuracy regardless of phrasing.
+   - Respond thoroughly, professionally, and accurately in clear Markdown English.
+
+5. COMPLETE COURSE DOSSIER (WHEN COURSE NUMBER/CODE OR FULL INFO IS ASKED):
    - CRITICAL REQUIREMENT: Whenever the user mentions a course code (e.g., "25CS101", "25CS102", "25MT103"), course title, or asks for "all information" / "motham information" / "complete syllabus" / "full details":
      You MUST provide the FULL, EXHAUSTIVE, UNABRIDGED course dossier from the document without skipping, truncating, or summarizing any section!
      Structure your answer with these clear sections:
@@ -61,7 +90,7 @@ CORE OPERATIONAL BEHAVIORS:
      ### 8. Source Page Citations
      * Cite all source pages (e.g. [Page 10], [Page 45], [Page 46]).
 
-4. STRICT YEAR-BY-YEAR SEPARATION (NEVER MIX YEARS TOGETHER):
+6. STRICT YEAR-BY-YEAR SEPARATION (NEVER MIX YEARS TOGETHER):
    - ABSOLUTE MANDATE: Whenever listing, presenting, explaining, or summarizing curriculum, courses, subjects, labs, electives, credit distributions, or recommendations across multiple semesters or years:
      * You MUST ALWAYS organize and present the information strictly YEAR-BY-YEAR and SEMESTER-BY-SEMESTER.
      * NEVER mix, merge, or lump subjects from different academic years together into a single combined list or paragraph!
@@ -92,11 +121,11 @@ CORE OPERATIONAL BEHAVIORS:
 
      * Even when providing suggestions, alternatives, or overview lists, ALWAYS group each subject under its exact academic year and semester. NEVER mix Year 1 with Year 2, 3, or 4!
 
-5. STRICT FACTUAL GROUNDING ON OTHER DOCUMENT QUESTIONS:
+7. STRICT FACTUAL GROUNDING ON OTHER DOCUMENT QUESTIONS:
    - For all other questions about regulations, credits, semester curriculum, or evaluations:
      * Provide exact details directly from the document text, with source page citations.
 
-6. WHEN WRONG INFORMATION OR NON-EXISTENT COURSE IS GIVEN (CONCISE RELATED SUGGESTIONS ONLY):
+8. WHEN WRONG INFORMATION OR NON-EXISTENT COURSE IS GIVEN (CONCISE RELATED SUGGESTIONS ONLY):
    - CRITICAL REQUIREMENT: If the user provides an invalid, wrong, or non-existent course code, topic, or information not present in "${documentInfo.filename}":
      * DO NOT write a long essay, explanation, or dump a massive list of subjects or entire curriculum tables!
      * Keep your response BRIEF, CONCISE, and TO THE POINT (maximum 3 to 4 lines).
@@ -104,25 +133,96 @@ CORE OPERATIONAL BEHAVIORS:
      * Provide ONLY 2 or 3 closest related suggestions (e.g. "Did you mean: **25CS101: Programming in C** or **25CS102: Problem Solving through Python**?").
      * Do NOT dump all departments, all modules, or unrelated subjects. Just give short, helpful suggestions!
 
-7. CONVERSATIONAL CONTINUITY & FOLLOW-UPS:
+9. CONVERSATIONAL CONTINUITY & FOLLOW-UPS:
    - Maintain multi-turn context. If the user asks follow-up questions (e.g., "What are its units?", "Who wrote the textbooks for it?", "What about the lab?", "Tell me more about Semester 2"), use the previous conversation context to understand which subject or topic they are asking about.
 
-8. FORMATTING & PRESENTATION:
+10. FORMATTING & PRESENTATION:
    - Format responses cleanly with bold section headings, bullet points, and clean Markdown tables where appropriate.
-   - Always communicate in clear, professional English.`;
+   - Always communicate in clear, professional English.
+
+11. PURE NORMAL TEXT ONLY (STRICTLY NO CODE / LATEX / MATH SYNTAX):
+   - ABSOLUTE PROHIBITION: You must NEVER output LaTeX, TeX, or math code syntax in your responses!
+   - DO NOT use dollar signs ($ or $$), \\text{...}, \\mathrm{...}, \\frac{...}, or backslashes.
+   - Write all hours, credits, symbols, and formulas in 100% normal, plain, human-readable text:
+     * CORRECT: "(L=13, T=8, P=12, SL=13)" or "L: 13, T: 8, P: 12, SL: 13 | Total: 46 Hours"
+     * STRICTLY FORBIDDEN: "($\\text{L}=13, \\text{T}=8, \\text{P}=12, \\text{SL}=13$)"
+     * CORRECT: "Industry - Interface (I2) Course" or "Industry - Interface (I^2)"
+     * STRICTLY FORBIDDEN: "Industry – Interface ($I^2$)"
+   - All course descriptions, credit distributions, contact hours, and outcomes MUST be presented in normal readable text without any programming or LaTeX code artifacts.`;
+}
+
+/**
+ * Utility to strip any accidental LaTeX/Math code into clean human-readable plain text
+ */
+function cleanLatexToPlainText(raw) {
+  if (!raw || typeof raw !== 'string') return '';
+  let cleaned = raw;
+
+  // Un-nest \text{...}, \mathrm{...}, \mathbf{...}, \mathit{...}, \textbf{...}
+  let prev = '';
+  while (prev !== cleaned) {
+    prev = cleaned;
+    cleaned = cleaned.replace(/\\(?:text|mathrm|mathbf|mathit|textbf|bm)\{([^{}]+)\}/g, '$1');
+  }
+
+  // Common math symbols to standard readable characters
+  cleaned = cleaned
+    .replace(/\\times/g, '×')
+    .replace(/\\div/g, '÷')
+    .replace(/\\cdot/g, '·')
+    .replace(/\\pm/g, '±')
+    .replace(/\\leq?/g, '≤')
+    .replace(/\\geq?/g, '≥')
+    .replace(/\\neq/g, '≠')
+    .replace(/\\approx/g, '≈')
+    .replace(/\\infty/g, '∞')
+    .replace(/\\dots/g, '...')
+    .replace(/\\rightarrow/g, '→')
+    .replace(/\\leftarrow/g, '←');
+
+  // Fractions: \frac{a}{b} -> a/b
+  cleaned = cleaned.replace(/\\frac\{([^{}]+)\}\{([^{}]+)\}/g, '$1/$2');
+
+  // Superscripts common in course titles like $I^2$ -> I² or I^2
+  cleaned = cleaned.replace(/\$I\^2\$/g, 'I²');
+  cleaned = cleaned.replace(/I\^2/g, 'I²');
+
+  // Remove block math $$...$$ and inline math $...$
+  cleaned = cleaned.replace(/\$\$([^$]+)\$\$/g, '$1');
+  cleaned = cleaned.replace(/\$([^$\n]+)\$/g, '$1');
+
+  // Clean any lingering backslash LaTeX commands
+  cleaned = cleaned.replace(/\\[,;!]/g, ' ');
+  cleaned = cleaned.replace(/\\(?:quad|qquad)/g, '  ');
+  cleaned = cleaned.replace(/\\(?:text|mathrm|mathbf)\b/g, '');
+
+  return cleaned;
 }
 
 /**
  * Select the most relevant sections of the document for the query and chat context.
  * Automatically expands course syllabus pages to include continuation pages (Module 2, COs, Textbooks).
  */
-function getRelevantContext(documentInfo, documentText, pagesData, query = '', chatHistory = []) {
-  // If the document is moderate size (<= 50,000 characters), send full text
-  if (!documentText || documentText.length <= 50000) {
-    return documentText;
+function getRelevantContext(documentInfo = {}, documentText = '', pagesData = [], query = '', chatHistory = []) {
+  // Build master detected course directory header if available
+  let masterCourseHeader = '';
+  if (Array.isArray(documentInfo.courses) && documentInfo.courses.length > 0) {
+    masterCourseHeader = `### MASTER DETECTED COURSE DIRECTORY (Total: ${documentInfo.courses.length} Courses Found in Document):\n` +
+      documentInfo.courses.map((c, i) => `${i + 1}. [${c.code}] ${c.title} (Page ${c.start_page}${c.end_page > c.start_page ? '-' + c.end_page : ''})`).join('\n') + '\n\n';
   }
 
-  // If page-level data is available (e.g., PDF)
+  // Modern Gemini models (3.8-flash, 3.7-flash, 2.5-flash) have a 1,000,000 token context window (~4,000,000 chars).
+  // If the document is within 450,000 characters (e.g. 200-250 page syllabus PDFs), send the FULL document text
+  // with page markers so Gemini has 100% of all courses, pages, and electives on prompt 1 without any omissions.
+  if (!documentText || documentText.length <= 450000) {
+    if (Array.isArray(pagesData) && pagesData.length > 0) {
+      const fullPagesText = pagesData.map(p => `--- PAGE ${p.pageNumber} ---\n${p.text}`).join('\n\n');
+      return masterCourseHeader + fullPagesText;
+    }
+    return masterCourseHeader + (documentText || '');
+  }
+
+  // For extremely large documents (> 450,000 characters, e.g. 1,000+ pages), use smart structure-aware RAG:
   if (Array.isArray(pagesData) && pagesData.length > 0) {
     const courseCodeRegex = /\b([0-9]{2}[A-Za-z]{2,4}[0-9]{2,4}[A-Za-z]?)\b/g;
     const detectedCourseCodes = new Set();
@@ -145,28 +245,36 @@ function getRelevantContext(documentInfo, documentText, pagesData, query = '', c
       }
     }
 
-    // Identify must-include pages (course detail page + continuation pages)
     const mustIncludePageNumbers = new Set();
 
-    // Always include first 2 pages (TOC / Overview)
-    for (let i = 1; i <= Math.min(2, pagesData.length); i++) {
+    // Always include all Table of Contents and Course Structure pages (e.g. pages 1-15)
+    for (let i = 1; i <= Math.min(15, pagesData.length); i++) {
       mustIncludePageNumbers.add(i);
     }
 
-    // If course codes are detected: find syllabus start pages AND continuation pages
+    // Also include any page that has core curriculum / structure headers
+    const structureKeywords = [
+      'table of contents', 'course structure', 'department electives',
+      'scheme of instruction', 'credit distribution', 'open electives'
+    ];
+    pagesData.forEach(p => {
+      const lowerText = p.text.toLowerCase();
+      if (structureKeywords.some(kw => lowerText.includes(kw))) {
+        mustIncludePageNumbers.add(p.pageNumber);
+      }
+    });
+
+    // If specific course codes are detected: include start page and continuation pages
     if (detectedCourseCodes.size > 0) {
       for (const code of detectedCourseCodes) {
         for (const p of pagesData) {
           const upperText = p.text.toUpperCase();
           if (upperText.includes(code)) {
             mustIncludePageNumbers.add(p.pageNumber);
-            // If this is a course syllabus detail page (usually page >= 16)
             if (p.pageNumber >= 16) {
-              // Always include continuation page p.pageNumber + 1 (contains Module 2, Outcomes, Textbooks)
               if (p.pageNumber + 1 <= pagesData.length) {
                 mustIncludePageNumbers.add(p.pageNumber + 1);
               }
-              // Check if continuation page starts next course; if not, include p.pageNumber + 2 as well
               if (p.pageNumber + 2 <= pagesData.length) {
                 const nextPage = pagesData.find(pg => pg.pageNumber === p.pageNumber + 1);
                 const startsNewCourse = /^[0-9]{2}[A-Z]{2}[0-9]{3}\s+[A-Z\s]+/m.test(nextPage?.text || '');
@@ -182,12 +290,11 @@ function getRelevantContext(documentInfo, documentText, pagesData, query = '', c
 
     const stopWords = new Set([
       'the', 'and', 'for', 'with', 'what', 'give', 'tell', 'show', 'any', 'like',
-      'this', 'that', 'there', 'is', 'are', 'was', 'were', 'course', 'title',
+      'this', 'that', 'there', 'is', 'are', 'was', 'were',
       'about', 'from', 'have', 'been', 'which', 'will', 'would', 'could', 'should',
-      'can', 'please', 'help', 'know', 'want', 'motham', 'information', 'ivvu', 'details', 'full'
+      'can', 'please', 'help', 'know', 'want', 'details', 'full'
     ]);
 
-    // Extract query tokens
     const rawTokens = (query || '')
       .toLowerCase()
       .replace(/[^a-z0-9\s]/gi, ' ')
@@ -200,26 +307,16 @@ function getRelevantContext(documentInfo, documentText, pagesData, query = '', c
       const lower = p.text.toLowerCase();
       let score = 0;
 
-      // Table of contents / curriculum structure pages (pages 1-12)
-      if (p.pageNumber <= 12) {
-        score += 8;
+      if (mustIncludePageNumbers.has(p.pageNumber)) {
+        score += 50;
       }
 
-      // Check tokens
       for (const token of allTokens) {
         if (lower.includes(token)) {
           const isCode = /^[0-9]{2}[a-z]{2,4}[0-9]{2,4}$/.test(token);
-          const weight = isCode ? 60 : 25;
+          const weight = isCode ? 70 : 20;
           score += weight;
-          const matches = lower.split(token).length - 1;
-          score += Math.min(matches * 5, 25);
         }
-      }
-
-      // Also check raw query string if alphanumeric
-      const cleanRaw = (query || '').toLowerCase().trim();
-      if (cleanRaw.length > 3 && lower.includes(cleanRaw)) {
-        score += 40;
       }
 
       return { page: p, score };
@@ -229,9 +326,8 @@ function getRelevantContext(documentInfo, documentText, pagesData, query = '', c
 
     const selected = [];
     let currentLength = 0;
-    const maxChars = 75000;
+    const maxChars = 300000;
 
-    // 1. Add all must-include pages first (TOC, course start page, and continuation pages)
     const sortedMustNumbers = Array.from(mustIncludePageNumbers).sort((a, b) => a - b);
     for (const pageNum of sortedMustNumbers) {
       const p = pagesData.find(pg => pg.pageNumber === pageNum);
@@ -243,7 +339,6 @@ function getRelevantContext(documentInfo, documentText, pagesData, query = '', c
       }
     }
 
-    // 2. Add other highest scoring relevant pages if capacity remains
     for (const item of scoredPages) {
       if (item.score > 0 && !selected.some(s => s.pageNumber === item.page.pageNumber)) {
         if (currentLength + item.page.text.length <= maxChars) {
@@ -256,12 +351,12 @@ function getRelevantContext(documentInfo, documentText, pagesData, query = '', c
     selected.sort((a, b) => a.pageNumber - b.pageNumber);
 
     if (selected.length > 0) {
-      return selected.map(p => `--- PAGE ${p.pageNumber} ---\n${p.text}`).join('\n\n');
+      return masterCourseHeader + selected.map(p => `--- PAGE ${p.pageNumber} ---\n${p.text}`).join('\n\n');
     }
   }
 
-  // Fallback: first 50,000 characters
-  return documentText.slice(0, 50000);
+  // Fallback
+  return masterCourseHeader + documentText.slice(0, 100000);
 }
 
 /**
@@ -298,7 +393,7 @@ async function validateApiKey(apiKey) {
  */
 async function* streamDocumentResponse({
   apiKey,
-  model = 'gemini-3.1-flash-lite',
+  model = 'gemini-3.8-flash',
   documentInfo,
   documentText,
   pagesData,
@@ -335,9 +430,11 @@ ${contextText}
 ${userQuery}
 
 ### RESPONSE INSTRUCTION:
-1. STRICT YEAR-BY-YEAR SEPARATION: Whenever listing courses, subjects, curriculum, or electives across multiple semesters or years, you MUST categorize and present them strictly Year-by-Year (I Year, II Year, III Year, IV Year) and Semester-by-Semester with clear headings. NEVER combine, mix, or lump different academic years together into an unorganized list!
-2. COMPLETE COURSE DOSSIER: If the user message asks about a course or course number (or asks for "all information", "motham information", "full details", or mentions a course code like 25CS101), provide the COMPLETE, UNABRIDGED course dossier covering Course Metadata, Description & Objectives, All Modules & All Units with all detailed topics, Course Outcomes (COs) Table, Textbooks, Reference Books, Skills, and Page Citations. Do NOT truncate or omit any section.
-3. WRONG INFORMATION / NOT FOUND: If the user provides a wrong, invalid, or non-existent course code (e.g. from another regulation) or information not in this document, DO NOT write a long explanation or dump a massive list of subjects! State simply in 1-2 lines that it was not found in this document, and provide ONLY 2 to 3 concise related suggestions. Keep the response under 4 lines total.`;
+1. FIRST PROMPT COMPLETENESS & ACCURACY: You MUST answer the user's question completely, exhaustively, and accurately on this VERY FIRST PROMPT. Do not provide a partial list or lazy summary. If asked about total courses, available courses, or curriculum (including queries in Tanglish such as "total anni courses available unnai"), state the exact total count of courses and provide the full unabridged list organized strictly Year-by-Year (Induction/Pre-Semester, Year 1, Year 2, Year 3, Year 4, Department Electives, Open Electives) without omitting any elective or course.
+2. STRICT YEAR-BY-YEAR SEPARATION: Whenever listing courses, subjects, curriculum, or electives across multiple semesters or years, you MUST categorize and present them strictly Year-by-Year (I Year, II Year, III Year, IV Year) and Semester-by-Semester with clear headings. NEVER combine, mix, or lump different academic years together into an unorganized list!
+3. COMPLETE COURSE DOSSIER: If the user message asks about a course or course number (or asks for "all information", "motham information", "full details", or mentions a course code like 25CS101), provide the COMPLETE, UNABRIDGED course dossier covering Course Metadata, Description & Objectives, All Modules & All Units with all detailed topics, Course Outcomes (COs) Table, Textbooks, Reference Books, Skills, and Page Citations. Do NOT truncate or omit any section.
+4. WRONG INFORMATION / NOT FOUND: If the user provides a wrong, invalid, or non-existent course code (e.g. from another regulation) or information not in this document, DO NOT write a long explanation or dump a massive list of subjects! State simply in 1-2 lines that it was not found in this document, and provide ONLY 2 to 3 concise related suggestions. Keep the response under 4 lines total.
+5. PURE NORMAL TEXT ONLY (STRICTLY NO LATEX OR CODE SYNTAX): Never use LaTeX code or math syntax like $\\text{L}=...$, $I^2$, or \\frac. Always write in simple, clean, normal plain text (e.g. write "(L=13, T=8, P=12, SL=13)" and "I^2" or "I2").`;
 
       const contents = [];
 
@@ -475,7 +572,7 @@ ${userQuery}
  */
 async function generateDocumentResponse({
   apiKey,
-  model = 'gemini-3.1-flash-lite',
+  model = 'gemini-3.8-flash',
   documentInfo,
   documentText,
   pagesData,
@@ -510,9 +607,11 @@ ${contextText}
 ${userQuery}
 
 ### RESPONSE INSTRUCTION:
-1. STRICT YEAR-BY-YEAR SEPARATION: Whenever listing courses, subjects, curriculum, or electives across multiple semesters or years, you MUST categorize and present them strictly Year-by-Year (I Year, II Year, III Year, IV Year) and Semester-by-Semester with clear headings. NEVER combine, mix, or lump different academic years together into an unorganized list!
-2. COMPLETE COURSE DOSSIER: If the user message asks about a course or course number (or asks for "all information", "motham information", "full details", or mentions a course code like 25CS101), provide the COMPLETE, UNABRIDGED course dossier covering Course Metadata, Description & Objectives, All Modules & All Units with all detailed topics, Course Outcomes (COs) Table, Textbooks, Reference Books, Skills, and Page Citations. Do NOT truncate or omit any section.
-3. WRONG INFORMATION / NOT FOUND: If the user provides a wrong, invalid, or non-existent course code (e.g. from another regulation) or information not in this document, DO NOT write a long explanation or dump a massive list of subjects! State simply in 1-2 lines that it was not found in this document, and provide ONLY 2 to 3 concise related suggestions. Keep the response under 4 lines total.`;
+1. FIRST PROMPT COMPLETENESS & ACCURACY: You MUST answer the user's question completely, exhaustively, and accurately on this VERY FIRST PROMPT. Do not provide a partial list or lazy summary. If asked about total courses, available courses, or curriculum (including queries in Tanglish such as "total anni courses available unnai"), state the exact total count of courses and provide the full unabridged list organized strictly Year-by-Year (Induction/Pre-Semester, Year 1, Year 2, Year 3, Year 4, Department Electives, Open Electives) without omitting any elective or course.
+2. STRICT YEAR-BY-YEAR SEPARATION: Whenever listing courses, subjects, curriculum, or electives across multiple semesters or years, you MUST categorize and present them strictly Year-by-Year (I Year, II Year, III Year, IV Year) and Semester-by-Semester with clear headings. NEVER combine, mix, or lump different academic years together into an unorganized list!
+3. COMPLETE COURSE DOSSIER: If the user message asks about a course or course number (or asks for "all information", "motham information", "full details", or mentions a course code like 25CS101), provide the COMPLETE, UNABRIDGED course dossier covering Course Metadata, Description & Objectives, All Modules & All Units with all detailed topics, Course Outcomes (COs) Table, Textbooks, Reference Books, Skills, and Page Citations. Do NOT truncate or omit any section.
+4. WRONG INFORMATION / NOT FOUND: If the user provides a wrong, invalid, or non-existent course code (e.g. from another regulation) or information not in this document, DO NOT write a long explanation or dump a massive list of subjects! State simply in 1-2 lines that it was not found in this document, and provide ONLY 2 to 3 concise related suggestions. Keep the response under 4 lines total.
+5. PURE NORMAL TEXT ONLY (STRICTLY NO LATEX OR CODE SYNTAX): Never use LaTeX code or math syntax like $\\text{L}=...$, $I^2$, or \\frac. Always write in simple, clean, normal plain text (e.g. write "(L=13, T=8, P=12, SL=13)" and "I^2" or "I2").`;
 
       const contents = [];
 
@@ -584,8 +683,10 @@ ${userQuery}
         throw new Error('Gemini returned an empty response. Please try rephrasing your question.');
       }
 
+      const cleanedAnswer = cleanLatexToPlainText(answerText);
+
       return {
-        answer: answerText,
+        answer: cleanedAnswer,
         modelUsed: currentModel,
         usage: data.usageMetadata || null
       };
@@ -616,5 +717,6 @@ module.exports = {
   generateDocumentResponse,
   streamDocumentResponse,
   buildSystemInstruction,
-  getRelevantContext
+  getRelevantContext,
+  cleanLatexToPlainText
 };

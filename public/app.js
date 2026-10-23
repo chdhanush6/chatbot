@@ -960,7 +960,7 @@ document.addEventListener('DOMContentLoaded', () => {
         body: JSON.stringify({
           prompt: query,
           apiKey: apiKey || '',
-          model: 'gemini-3.1-flash-lite',
+          model: 'gemini-3.8-flash',
           language: 'en',
           chatHistory: chatHistoryPayload
         }),
@@ -1027,13 +1027,14 @@ document.addEventListener('DOMContentLoaded', () => {
       }
 
       const botTimestamp = Date.now();
-      attachBotActions(botRow, accumulatedText, docNameResult, botTimestamp, query);
+      const sanitizedText = cleanLatexToPlainText(accumulatedText);
+      attachBotActions(botRow, sanitizedText, docNameResult, botTimestamp, query);
 
       // Save to session in localStorage
-      if (accumulatedText.trim().length > 0) {
+      if (sanitizedText.trim().length > 0) {
         session.messages.push({
           sender: 'bot',
-          text: accumulatedText,
+          text: sanitizedText,
           meta: { documentName: docNameResult, stopped: wasAborted },
           timestamp: botTimestamp
         });
@@ -1299,14 +1300,61 @@ document.addEventListener('DOMContentLoaded', () => {
     return suggestions.slice(0, 3);
   }
 
+  // Strip any accidental LaTeX/Math code into clean normal plain text
+  function cleanLatexToPlainText(raw) {
+    if (!raw || typeof raw !== 'string') return '';
+    let cleaned = raw;
+
+    // 1. Un-nest \text{...}, \mathrm{...}, \mathbf{...}, \mathit{...}, \textbf{...}
+    let prev = '';
+    while (prev !== cleaned) {
+      prev = cleaned;
+      cleaned = cleaned.replace(/\\(?:text|mathrm|mathbf|mathit|textbf|bm)\{([^{}]+)\}/g, '$1');
+    }
+
+    // 2. Common math symbols to standard readable characters
+    cleaned = cleaned
+      .replace(/\\times/g, '×')
+      .replace(/\\div/g, '÷')
+      .replace(/\\cdot/g, '·')
+      .replace(/\\pm/g, '±')
+      .replace(/\\leq?/g, '≤')
+      .replace(/\\geq?/g, '≥')
+      .replace(/\\neq/g, '≠')
+      .replace(/\\approx/g, '≈')
+      .replace(/\\infty/g, '∞')
+      .replace(/\\dots/g, '...')
+      .replace(/\\rightarrow/g, '→')
+      .replace(/\\leftarrow/g, '←');
+
+    // 3. Fractions: \frac{a}{b} -> a/b
+    cleaned = cleaned.replace(/\\frac\{([^{}]+)\}\{([^{}]+)\}/g, '$1/$2');
+
+    // 4. Superscripts common in course titles like $I^2$ -> I² or I^2
+    cleaned = cleaned.replace(/\$I\^2\$/g, 'I²');
+    cleaned = cleaned.replace(/I\^2/g, 'I²');
+
+    // 5. Remove block math $$...$$ and inline math $...$
+    cleaned = cleaned.replace(/\$\$([^$]+)\$\$/g, '$1');
+    cleaned = cleaned.replace(/\$([^$\n]+)\$/g, '$1');
+
+    // 6. Clean any lingering backslash LaTeX commands
+    cleaned = cleaned.replace(/\\[,;!]/g, ' ');
+    cleaned = cleaned.replace(/\\(?:quad|qquad)/g, '  ');
+    cleaned = cleaned.replace(/\\(?:text|mathrm|mathbf)\b/g, '');
+
+    return cleaned;
+  }
+
   // Format markdown & citations
   function formatBotResponse(text) {
+    const cleanText = cleanLatexToPlainText(text);
     if (typeof marked !== 'undefined') {
-      let formatted = marked.parse(text);
+      let formatted = marked.parse(cleanText);
       formatted = formatted.replace(/\[Page\s*([^\]]+)\]/gi, '<span class="citation-tag">Page $1</span>');
       return formatted;
     }
-    return escapeHtml(text).replace(/\n/g, '<br>');
+    return escapeHtml(cleanText).replace(/\n/g, '<br>');
   }
 
   // Text-to-speech

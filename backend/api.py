@@ -10,11 +10,13 @@ from fastapi import FastAPI, UploadFile, File, Form, HTTPException, Query, Respo
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse, JSONResponse
 from pydantic import BaseModel
-from dotenv import load_dotenv
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+except ImportError:
+    pass
 
 from .syllabus_extractor import SyllabusExtractor, CourseInfo
-
-load_dotenv()
 
 app = FastAPI(
     title="Universal Syllabus AI Assistant & Course PDF Extractor",
